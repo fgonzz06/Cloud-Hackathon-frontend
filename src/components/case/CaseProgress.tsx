@@ -1,18 +1,32 @@
-// src/components/case/CaseProgress.tsx
+// centinela-frontend/src/components/case/CaseProgress.tsx
+import type { CaseFile } from "../../types/manuscript"; // ← Importar el tipo
+
 interface CaseProgressProps {
   caseFile: CaseFile;
+  results?: any; // ← Añadir results como prop opcional
 }
 
-export function CaseProgress({ caseFile }: CaseProgressProps) {
+const STAGE_LABELS: Record<string, string> = {
+  PENDING: "Recibiendo expediente",
+  PROCESSING: "Auditando referencias bibliográficas",
+  COMPLETED: "✅ Análisis completado",
+  ERROR: "❌ Error en el procesamiento",
+};
+
+export function CaseProgress({ caseFile, results }: CaseProgressProps) {
   const { progress, status, fileName, topic } = caseFile;
   
-  // Calcular porcentaje
-  const pct = progress.totalBatches > 0
-    ? Math.round((progress.processedBatches / progress.totalBatches) * 100)
-    : status === "PENDING" ? 4 : 10; // ← Si está en PENDING, mostrar 4%
-
-  // Si está COMPLETED pero no hay resultados, mostrar 99%
-  const displayPct = status === "COMPLETED" ? 100 : pct;
+  let pct = 0;
+  if (status === "PENDING") {
+    pct = 4;
+  } else if (status === "COMPLETED") {
+    pct = 100;
+  } else if (progress.totalBatches > 0) {
+    pct = Math.round((progress.processedBatches / progress.totalBatches) * 100);
+    if (pct === 0) pct = 10;
+  } else {
+    pct = 10;
+  }
 
   return (
     <div className="rounded-sm border border-paper/12 bg-paper/[0.02] p-8">
@@ -31,28 +45,30 @@ export function CaseProgress({ caseFile }: CaseProgressProps) {
       </div>
 
       <p className="mt-6 text-sm text-muted-ink">
-        {status === "PENDING" && "Iniciando procesamiento..."}
-        {status === "PROCESSING" && "Auditando referencias bibliográficas"}
-        {status === "COMPLETED" && "✅ Análisis completado"}
-        {status === "ERROR" && "❌ Error en el procesamiento"}
+        {STAGE_LABELS[status] ?? "Procesando"}
+        {status === "COMPLETED" && (
+          <span className="ml-2 text-valid">Índice de integridad: {caseFile.globalIntegrityIndex}%</span>
+        )}
       </p>
 
       <div className="mt-3 h-px w-full overflow-hidden bg-paper/10">
         <div
           className="h-full bg-seal transition-all duration-700 ease-out"
-          style={{ width: `${displayPct}%` }}
+          style={{ width: `${pct}%` }}
         />
       </div>
 
       <div className="mt-3 flex items-center justify-between font-mono text-[11px] text-muted-ink">
         <span>
-          Lote {progress.processedBatches} de {progress.totalBatches || "—"}
+          {status === "COMPLETED" 
+            ? `✅ ${progress.processedBatches} de ${progress.totalBatches || "—"} referencias auditadas`
+            : `Lote ${progress.processedBatches} de ${progress.totalBatches || "—"}`}
         </span>
-        <span>{displayPct}%</span>
+        <span>{pct}%</span>
       </div>
-      
+
       {status === "COMPLETED" && !results && (
-        <p className="mt-2 text-xs text-muted-ink animate-pulse">
+        <p className="mt-2 text-xs text-valid animate-pulse">
           Cargando resultados...
         </p>
       )}
