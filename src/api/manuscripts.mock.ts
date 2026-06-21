@@ -107,25 +107,15 @@ export async function uploadFileToStorage(_uploadUrl: string, _file: File): Prom
 /**
  * GET /api/v1/manuscripts/{manuscriptId}
  * Simula el avance de lotes en función del tiempo transcurrido desde la subida.
- *
- * Nota: si el manuscriptId no está en el store (por ejemplo, porque vino del
- * backend real de upload-url y no del mock), lo registramos en este momento
- * en vez de fallar — así el polling de estado sigue funcionando en modo mixto
- * (upload real + status/results simulados) hasta que esos 2 endpoints existan.
  */
 export async function getManuscriptStatus(
   manuscriptId: string,
 ): Promise<ManuscriptStatusResponse> {
   await delay(300);
 
-  let state = mockStore.get(manuscriptId);
+  const state = mockStore.get(manuscriptId);
   if (!state) {
-    state = {
-      fileName: "manuscrito.pdf",
-      startedAt: Date.now(),
-      totalBatches: TOTAL_BATCHES_DEMO,
-    };
-    mockStore.set(manuscriptId, state);
+    throw new Error(`Manuscrito ${manuscriptId} no encontrado`);
   }
 
   const elapsed = Date.now() - state.startedAt;

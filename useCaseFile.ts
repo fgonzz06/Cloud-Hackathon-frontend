@@ -1,11 +1,12 @@
+// centinela-frontend/useCaseFile.ts
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getManuscriptResults,
   getManuscriptStatus,
   getUploadUrl,
   uploadFileToStorage,
-} from "../api/manuscripts";
-import type { CaseFile, ManuscriptResultsResponse } from "../types/manuscript";
+} from "./src/api/manuscripts";  // ← Importar desde src/
+import type { CaseFile, ManuscriptResultsResponse } from "./src/types/manuscript";  // ← Importar desde src/
 
 const POLL_INTERVAL_MS = 3000;
 
@@ -17,11 +18,19 @@ interface UseCaseFileReturn {
   reset: () => void;
 }
 
+/**
+ * Orquesta el flujo completo descrito en el Manifiesto de API:
+ * 1. Pide upload-url
+ * 2. Sube el archivo (PUT a la presigned URL)
+ * 3. Hace polling cada 3s a /manuscripts/{id} hasta status === COMPLETED
+ * 4. Pide /manuscripts/{id}/results
+ */
 export function useCaseFile(): UseCaseFileReturn {
   const [caseFile, setCaseFile] = useState<CaseFile | null>(null);
   const [results, setResults] = useState<ManuscriptResultsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isCompletedRef = useRef<boolean>(false);
 
   const stopPolling = useCallback(() => {
     if (pollRef.current) {
@@ -36,12 +45,15 @@ export function useCaseFile(): UseCaseFileReturn {
     async (file: File) => {
       setError(null);
       setResults(null);
+      isCompletedRef.current = false;
 
       try {
         const { manuscriptId, uploadUrl } = await getUploadUrl({
           fileName: file.name,
           contentType: file.type || "application/pdf",
         });
+
+        console.log("[DEBUG] Manuscript ID:", manuscriptId);
 
         setCaseFile({
           manuscriptId,
@@ -53,12 +65,23 @@ export function useCaseFile(): UseCaseFileReturn {
         });
 
         await uploadFileToStorage(uploadUrl, file);
+        console.log("[DEBUG] Archivo subido exitosamente");
 
         setCaseFile((prev) => (prev ? { ...prev, status: "PROCESSING" } : prev));
 
+        stopPolling();
+
         pollRef.current = setInterval(async () => {
           try {
+            if (isCompletedRef.current) {
+              return;
+            }
+
             const status = await getManuscriptStatus(manuscriptId);
+            console.log("[DEBUG] Polling status:", status);
+
+            const currentStatus = String(status.status).toUpperCase().trim();
+            console.log("[DEBUG] Status normalizado:", currentStatus);
 
             setCaseFile({
               manuscriptId: status.manuscriptId,
@@ -70,24 +93,36 @@ export function useCaseFile(): UseCaseFileReturn {
               createdAt: Date.now(),
             });
 
-            if (status.status === "COMPLETED") {
+            if (currentStatus === "COMPLETED" || currentStatus === "COMPLETADO") {
+              console.log("[DEBUG] 🎉 Manuscrito COMPLETADO!");
+              isCompletedRef.current = true;
               stopPolling();
-              const finalResults = await getManuscriptResults(manuscriptId);
-              setResults(finalResults);
+
+              try {
+                console.log("[DEBUG] Obteniendo resultados...");
+                const finalResults = await getManuscriptResults(manuscriptId);
+                console.log("[DEBUG] Resultados obtenidos:", finalResults);
+                setResults(finalResults);
+              } catch (resultsError) {
+                console.error("[ERROR] Error al obtener resultados:", resultsError);
+                setError("Error al obtener los resultados del análisis.");
+              }
+              return;
             }
 
-            if (status.status === "ERROR") {
+            if (currentStatus === "ERROR" || currentStatus === "FAILED") {
+              console.log("[DEBUG] ❌ Manuscrito en ERROR");
               stopPolling();
               setError("El análisis no pudo completarse. Intenta con otro archivo.");
             }
+
           } catch (err) {
-            console.error("[DEBUG] Error real en polling de status:", err);
-            stopPolling();
-            setError("Se perdió la conexión con el servidor de análisis.");
+            console.error("[DEBUG] Error en polling:", err);
           }
         }, POLL_INTERVAL_MS);
+
       } catch (err) {
-        console.error("[DEBUG] Error real al iniciar subida:", err);
+        console.error("[DEBUG] Error al iniciar subida:", err);
         setError("No se pudo iniciar la subida. Verifica tu conexión e intenta de nuevo.");
       }
     },
@@ -96,6 +131,7 @@ export function useCaseFile(): UseCaseFileReturn {
 
   const reset = useCallback(() => {
     stopPolling();
+    isCompletedRef.current = false;
     setCaseFile(null);
     setResults(null);
     setError(null);

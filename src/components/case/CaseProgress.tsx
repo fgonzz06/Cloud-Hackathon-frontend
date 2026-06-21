@@ -1,20 +1,18 @@
-import type { CaseFile } from "../../types/manuscript";
-
+// src/components/case/CaseProgress.tsx
 interface CaseProgressProps {
   caseFile: CaseFile;
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  PENDING: "Recibiendo expediente",
-  PROCESSING: "Auditando referencias bibliográficas",
-};
-
 export function CaseProgress({ caseFile }: CaseProgressProps) {
   const { progress, status, fileName, topic } = caseFile;
-  const pct =
-    progress.totalBatches > 0
-      ? Math.round((progress.processedBatches / progress.totalBatches) * 100)
-      : 4;
+  
+  // Calcular porcentaje
+  const pct = progress.totalBatches > 0
+    ? Math.round((progress.processedBatches / progress.totalBatches) * 100)
+    : status === "PENDING" ? 4 : 10; // ← Si está en PENDING, mostrar 4%
+
+  // Si está COMPLETED pero no hay resultados, mostrar 99%
+  const displayPct = status === "COMPLETED" ? 100 : pct;
 
   return (
     <div className="rounded-sm border border-paper/12 bg-paper/[0.02] p-8">
@@ -33,13 +31,16 @@ export function CaseProgress({ caseFile }: CaseProgressProps) {
       </div>
 
       <p className="mt-6 text-sm text-muted-ink">
-        {STAGE_LABELS[status] ?? "Procesando"}
+        {status === "PENDING" && "Iniciando procesamiento..."}
+        {status === "PROCESSING" && "Auditando referencias bibliográficas"}
+        {status === "COMPLETED" && "✅ Análisis completado"}
+        {status === "ERROR" && "❌ Error en el procesamiento"}
       </p>
 
       <div className="mt-3 h-px w-full overflow-hidden bg-paper/10">
         <div
           className="h-full bg-seal transition-all duration-700 ease-out"
-          style={{ width: `${pct}%` }}
+          style={{ width: `${displayPct}%` }}
         />
       </div>
 
@@ -47,8 +48,14 @@ export function CaseProgress({ caseFile }: CaseProgressProps) {
         <span>
           Lote {progress.processedBatches} de {progress.totalBatches || "—"}
         </span>
-        <span>{pct}%</span>
+        <span>{displayPct}%</span>
       </div>
+      
+      {status === "COMPLETED" && !results && (
+        <p className="mt-2 text-xs text-muted-ink animate-pulse">
+          Cargando resultados...
+        </p>
+      )}
     </div>
   );
 }
