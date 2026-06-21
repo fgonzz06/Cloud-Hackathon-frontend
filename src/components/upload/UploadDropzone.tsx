@@ -88,7 +88,7 @@ export function UploadDropzone({ onFileSelected, disabled }: UploadDropzoneProps
             {isDragging ? "Suelta el manuscrito" : "Abre un nuevo expediente"}
           </p>
           <p className="mt-1.5 text-sm text-muted-ink">
-            Arrastra el manuscrito (PDF o DOCX) o haz clic para elegirlo
+            Arrastra el manuscrito (PDF) o haz clic para elegirlo
           </p>
         </div>
 
