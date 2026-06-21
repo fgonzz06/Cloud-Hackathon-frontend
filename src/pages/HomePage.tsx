@@ -76,7 +76,7 @@ export function HomePage() {
 
       <footer className="border-t border-paper/10 px-6 py-6">
         <p className="mx-auto max-w-5xl text-center font-mono text-[10px] uppercase tracking-[0.16em] text-muted-ink/60">
-          Centinela · Hackathon Cloud · Demo local con datos simulados
+          Centinela · Hackathon Cloud · Toda cita tiene una fuente. Verifica la suya.
         </p>
       </footer>
     </div>
